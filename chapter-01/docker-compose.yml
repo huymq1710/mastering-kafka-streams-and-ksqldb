@@ -2,6 +2,7 @@
 version: '2'
 
 services:
+  # Centralized service for storing metadata such as topic configuration. Up to now, ZooKeeper was fully removed from Kafka
   zookeeper:
     image: confluentinc/cp-zookeeper:6.0.0
     hostname: zookeeper
@@ -11,7 +12,7 @@ services:
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
-
+  # single-node cluster: 1 broker
   kafka:
     image: confluentinc/cp-enterprise-kafka:6.0.0
     hostname: kafka
