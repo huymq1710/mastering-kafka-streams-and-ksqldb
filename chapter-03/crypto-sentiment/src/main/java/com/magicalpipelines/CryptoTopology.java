@@ -39,9 +39,16 @@ class CryptoTopology {
    */
   public static Topology buildV1() {
     StreamsBuilder builder = new StreamsBuilder();
-
+    /**
+     * keys and values coming out of the tweets topic are being encoded as byte arrays. But the
+     * tweet records are actually encoded as JSON objects by the source connector:
+     * https://www.confluent.io/hub/jcustenborder/kafka-connect-twitter Means that Kafka clients,
+     * including Kafka Streams applications, are responsible for serializing and deserializing these
+     * byte streams in order to work with higher-level objects and formats.
+     */
     KStream<byte[], byte[]> stream = builder.stream("tweets");
-    stream.print(Printed.<byte[], byte[]>toSysOut().withLabel("tweets-stream"));
+    stream.print(
+        Printed.<byte[], byte[]>toSysOut().withLabel("tweets-stream")); // view data as it flows
 
     return builder.build();
   }
@@ -54,6 +61,7 @@ class CryptoTopology {
     // the builder is used to construct the topology
     StreamsBuilder builder = new StreamsBuilder();
 
+    // Step 1:
     // start streaming tweets using our custom value serdes. Note: regarding
     // the key serdes (Serdes.ByteArray()), if could also use Serdes.Void()
     // if we always expect our keys to be null
@@ -61,6 +69,7 @@ class CryptoTopology {
         builder.stream("tweets", Consumed.with(Serdes.ByteArray(), new TweetSerdes()));
     stream.print(Printed.<byte[], Tweet>toSysOut().withLabel("tweets-stream"));
 
+    // Step: 2
     // filter out retweets
     KStream<byte[], Tweet> filtered =
         stream.filterNot(
@@ -68,6 +77,7 @@ class CryptoTopology {
               return tweet.isRetweet();
             });
 
+    // Step: 3
     // match all tweets that specify English as the source language
     Predicate<byte[], Tweet> englishTweets = (key, tweet) -> tweet.getLang().equals("en");
 
@@ -85,6 +95,7 @@ class CryptoTopology {
     KStream<byte[], Tweet> nonEnglishStream = branches[1];
     nonEnglishStream.print(Printed.<byte[], Tweet>toSysOut().withLabel("tweets-non-english"));
 
+    // Step 4:
     // for non-English tweets, translate the tweet text first.
     KStream<byte[], Tweet> translatedStream =
         nonEnglishStream.mapValues(
@@ -92,9 +103,11 @@ class CryptoTopology {
               return languageClient.translate(tweet, "en");
             });
 
+    // Step 5:
     // merge the two streams
     KStream<byte[], Tweet> merged = englishStream.merge(translatedStream);
 
+    // Step 6:
     // enrich with sentiment and salience scores
     // note: the EntitySentiment class is auto-generated from the schema
     // definition in src/main/avro/entity_sentiment.avsc

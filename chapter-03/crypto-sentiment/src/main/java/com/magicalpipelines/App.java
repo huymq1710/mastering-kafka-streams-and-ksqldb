@@ -21,9 +21,13 @@ class App {
     // build the topology and start streaming!
     KafkaStreams streams = new KafkaStreams(topology, config);
 
+    // stop the Kafka Streams application when a global shutdown signal is received.
     Runtime.getRuntime().addShutdownHook(new Thread(streams::close));
 
     System.out.println("Starting Twitter streams");
+
+    // the topology is executed via background processing threads --> that why a shutdown hook is
+    // required.
     streams.start();
   }
 }
